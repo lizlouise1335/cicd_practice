@@ -21,6 +21,9 @@ on:
   push:
     branches:
       - main
+      # Also run on the Laravel branch while we build it, so pushes
+      # there get a green check or red X too.
+      - laravel
   # 2. When someone opens or updates a pull request INTO main.
   #    This is the important one: it tests the code before it's merged,
   #    so reviewers see a green check (safe) or a red X (don't merge).
@@ -62,7 +65,46 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      # Step 2: install Node.js on the machine.
+      # ---------------- BACKEND: PHP (Laravel) ----------------
+
+      # Step 2: install PHP. The fresh machine has no PHP, just as it had
+      # no Node. 8.5 matches the version Homebrew installed on your Mac.
+      # composer.json requires at least 8.3.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          # Installs Composer too (PHP's version of npm).
+          tools: composer
+
+      # Step 3: BUILD CACHING for PHP. Same idea as "cache: npm" below:
+      # save the vendor/ folder, labeled with a fingerprint of
+      # composer.lock. Lock file unchanged = reuse it instead of
+      # downloading Laravel and ~100 packages again.
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+
+      # Step 4: install PHP packages. Like npm ci, this installs EXACTLY
+      # the versions in composer.lock. The flags mean: never stop to ask
+      # questions, and download zip files (faster than cloning git repos).
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Step 5: Laravel reads settings from a .env file, which is never
+      # committed (it holds secrets). Copy the safe template and create a
+      # throwaway APP_KEY (Laravel's encryption secret) just for this run.
+      - name: Prepare Laravel environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # ---------------- FRONTEND: TypeScript (Node) ----------------
+
+      # Step 6: install Node.js. With Laravel, Node no longer runs the
+      # server. It only type-checks and builds the TypeScript for browsers.
       - name: Set up Node.js
         uses: actions/setup-node@v7
         # "with:" passes settings to the action.
@@ -77,19 +119,24 @@ jobs:
           # everything from the internet again. Same idea as the S3 shelf.
           cache: npm
 
-      # Step 3: install the project's packages.
+      # Step 7: install the project's JavaScript packages.
       # "run:" means "type this command in the terminal".
       # npm ci (not npm install) installs EXACTLY the versions in
       # package-lock.json, so CI tests the same thing every time.
       - name: Install dependencies
         run: npm ci
 
-      # Step 4: the actual check. "verify" is the script you added to
-      # package.json. It runs three commands in a row and stops at the
-      # first failure:
+      # Step 8: check the frontend. "verify" in package.json runs two
+      # commands in a row and stops at the first failure:
       #   npm run typecheck  -> are the TypeScript types correct?
-      #   npm run test       -> do the tests pass?
-      #   npm run build      -> does the app compile?
-      # All three pass = green check. Any one fails = red X.
-      - name: Verify application
+      #   npm run build      -> does Vite compile the TS/CSS for browsers?
+      - name: Verify frontend (TypeScript)
         run: npm run verify
+
+      # ---------------- BACKEND TESTS ----------------
+
+      # Step 9: run the Laravel tests in tests/ (health endpoint and home
+      # page). This replaces the old "npm run test".
+      # Every step passes = green check. Any one fails = red X.
+      - name: Run backend tests (PHP)
+        run: php artisan test

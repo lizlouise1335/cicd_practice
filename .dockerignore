@@ -1,0 +1,27 @@
+# Like .gitignore, but for "docker build": these never get copied into
+# the image. It keeps the image small and keeps secrets out of it.
+
+# Installed packages: the Dockerfile installs fresh copies itself.
+vendor/
+node_modules/
+
+# Built on your Mac. The Dockerfile builds its own in stage 1.
+public/build/
+public/hot
+
+# Secrets and local settings. APP_KEY is passed at runtime instead.
+.env
+.env.*
+!.env.example
+
+# Not needed to run the app.
+.git/
+.github/
+tests/
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+*.log
+.DS_Store
+.phpunit.cache

@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Shown on the home page. CI/CD sets APP_VERSION at deploy time.
+    'version' => env('APP_VERSION', 'development'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

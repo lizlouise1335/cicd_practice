@@ -1,69 +1,70 @@
-# CI/CD Lab Starter
+# CI/CD Lab (Laravel + TypeScript)
 
-A small Express and TypeScript app for the CI/CD Crash Course. Use this starting point to follow along with automated testing, GitHub Actions, and deployment to Render.
+The CI/CD Crash Course lab, rebuilt with a **PHP (Laravel) backend** and a **TypeScript frontend**.
 
-The starter includes a home page, a health endpoint, and a passing health endpoint test. You will add the combined `verify` script, GitHub Actions workflow, and version endpoint during the course.
+- `main` branch: the original Express + TypeScript version that follows the course.
+- `laravel` branch: this version.
+
+## How the pieces fit
+
+| Part | Language | Where | Runs on |
+|---|---|---|---|
+| Routes, pages, API | PHP (Laravel 13) | `routes/web.php`, `resources/views/` | Server |
+| Interactive frontend | TypeScript | `resources/js/app.ts` | Browser (compiled by Vite) |
+| Backend tests | PHP (PHPUnit) | `tests/Feature/` | `php artisan test` |
+| Frontend checks | TypeScript / Vite | `tsconfig.json`, `vite.config.js` | `npm run verify` |
+
+The home page is rendered by PHP. Then `app.ts` calls `/api/health` from the browser and shows whether the server is healthy.
 
 ## Requirements
 
+- PHP 8.3+ (CI uses 8.5) and Composer
 - Node.js 24 and npm
 - Git
-- GitHub and Render accounts for the deployment sections
+
+On macOS: `brew install php composer node`
 
 ## Get started
 
-Clone the starter into a new folder:
-
 ```bash
-git clone https://github.com/bradtraversy/cicd-lab-starter.git cicd-lab
-cd cicd-lab
-npm ci
+composer install            # PHP packages -> vendor/
+npm ci                      # JS packages  -> node_modules/
+cp .env.example .env        # local settings (never committed)
+php artisan key:generate    # creates APP_KEY in .env
+npm run build               # compile TypeScript + CSS
+php artisan serve           # http://localhost:8000
 ```
 
-Start the development server:
+The [health endpoint](http://localhost:8000/api/health) returns `{"status":"ok"}`.
 
-```bash
-npm run dev
-```
-
-Open [localhost:3000](http://localhost:3000). The [health endpoint](http://localhost:3000/api/health) returns HTTP 200 with:
-
-```json
-{"status":"ok"}
-```
-
-Stop the server with Ctrl+C.
+For live frontend reloading during development, run `npm run dev` in a second terminal alongside `php artisan serve`.
 
 ## Scripts
 
-- `npm run dev`: start the development server with automatic restarts.
-- `npm run typecheck`: check TypeScript without generating output.
-- `npm test`: run the health endpoint test. The test starts and stops its own server.
-- `npm run build`: compile the app into `dist`.
-- `npm start`: run the compiled app after building it.
+| Command | What it does |
+|---|---|
+| `php artisan serve` | Start the PHP development server |
+| `php artisan test` | Run the backend tests |
+| `npm run dev` | Vite dev server with hot reload for TS/CSS |
+| `npm run typecheck` | Check TypeScript types |
+| `npm run build` | Compile TS/CSS into `public/build` |
+| `npm run verify` | Typecheck + build (what CI runs for the frontend) |
 
-## Start your own repository
+## CI
 
-From inside your newly cloned `cicd-lab` folder, remove the starter's Git history and remote connection, then initialize your own repository. This preserves the app files.
+`.github/workflows/ci.yml` runs on pushes and pull requests to `main`, and on pushes to `laravel`:
 
-These commands use Bash or Zsh. On Windows, use Git Bash.
-
-```bash
-rm -rf .git
-git init -b main
-git add .
-git commit -m "feat: add CI/CD lab starter"
-```
-
-Create an empty `cicd-lab` repository on GitHub without a README, license, or gitignore. Replace `YOUR_USERNAME` below with your GitHub username:
-
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/cicd-lab.git
-git push -u origin main
-```
-
-Continue with the course to add verification and deployment. Keep `package-lock.json` committed; dependencies, build output, and environment files are excluded by `.gitignore`.
+1. Set up PHP, restore the Composer cache, `composer install`
+2. Create `.env` and a throwaway `APP_KEY`
+3. Set up Node (with npm cache), `npm ci`, `npm run verify`
+4. `php artisan test`
 
 ## Configuration
 
-The server uses port `3000` unless `PORT` is set. The home page displays `APP_VERSION`, defaulting to `development`. Neither variable is required to run the starter locally.
+| Variable | Default | Used for |
+|---|---|---|
+| `APP_VERSION` | `development` | Shown on the home page |
+| `APP_KEY` | *(none)* | Laravel's encryption key. Generate with `php artisan key:generate` |
+| `APP_URL` | `http://localhost:8000` | Base URL Laravel uses when building links |
+
+Keep `composer.lock` and `package-lock.json` committed. `vendor/`, `node_modules/`, `public/build/`, and `.env` are excluded by `.gitignore`.
