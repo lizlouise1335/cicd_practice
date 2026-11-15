@@ -1,34 +1,95 @@
+# =====================================================================
+# This file is a recipe that GitHub follows automatically.
+# "CI" = Continuous Integration: every time code changes, a robot
+# checks it (type check, tests, build) so broken code gets caught
+# BEFORE it reaches users.
+#
+# GitHub finds this file because it lives in .github/workflows/.
+# Any .yml file in that folder becomes a "workflow".
+#
+# YAML rules: indentation matters (spaces, never tabs), "key: value"
+# sets something, and "- " starts an item in a list.
+# =====================================================================
+
+# The name shown in the GitHub "Actions" tab and next to each commit
+# (the green check or red X).
 name: CI
 
+# "on" = WHEN does this run? (the trigger)
 on:
+  # 1. When someone pushes commits straight to the main branch.
   push:
     branches:
       - main
+  # 2. When someone opens or updates a pull request INTO main.
+  #    This is the important one: it tests the code before it's merged,
+  #    so reviewers see a green check (safe) or a red X (don't merge).
   pull_request:
     branches:
       - main
 
+# What the robot is allowed to do with your repo.
+# "contents: read" = it can read the code but can't change it.
+# Giving a job only the access it needs is called "least privilege",
+# a security best practice.
 permissions:
   contents: read
 
+# A workflow is made of one or more "jobs". Each job runs on its own
+# fresh computer. This file has one job.
 jobs:
+  # "verify" is the job's ID (you pick it). Other jobs can refer to it,
+  # e.g. a future "deploy" job could say "only run after verify passes".
   verify:
+    # Friendly name shown in the GitHub UI.
     name: Verify
+
+    # The computer this runs on: a brand-new Linux (Ubuntu) machine that
+    # GitHub lends you for a few minutes and throws away afterward.
+    # That's why every step below starts from nothing.
     runs-on: ubuntu-latest
+
+    # Safety net: if something hangs, stop it after 10 minutes instead of
+    # burning through your free minutes.
     timeout-minutes: 10
 
+    # The steps run in order, top to bottom. If any step fails,
+    # the job stops and you get a red X.
     steps:
+      # Step 1: the new machine is empty, so first download your code onto it.
+      # "uses:" means "run a ready-made action someone else wrote".
+      # actions/checkout is GitHub's official one; @v7 pins the version.
       - name: Check out repository
         uses: actions/checkout@v7
 
+      # Step 2: install Node.js on the machine.
       - name: Set up Node.js
         uses: actions/setup-node@v7
+        # "with:" passes settings to the action.
         with:
+          # Use Node 24, matching "engines" in package.json. Your Mac has 26,
+          # but CI uses 24, so this is the version that counts.
           node-version: 24
+          # BUILD CACHING (the CTO question!). Downloading packages is slow.
+          # This saves npm's download cache between runs, labeled with a
+          # fingerprint of package-lock.json. If the lock file hasn't changed,
+          # GitHub restores the saved cache instead of downloading
+          # everything from the internet again. Same idea as the S3 shelf.
           cache: npm
 
+      # Step 3: install the project's packages.
+      # "run:" means "type this command in the terminal".
+      # npm ci (not npm install) installs EXACTLY the versions in
+      # package-lock.json, so CI tests the same thing every time.
       - name: Install dependencies
         run: npm ci
 
+      # Step 4: the actual check. "verify" is the script you added to
+      # package.json. It runs three commands in a row and stops at the
+      # first failure:
+      #   npm run typecheck  -> are the TypeScript types correct?
+      #   npm run test       -> do the tests pass?
+      #   npm run build      -> does the app compile?
+      # All three pass = green check. Any one fails = red X.
       - name: Verify application
         run: npm run verify
